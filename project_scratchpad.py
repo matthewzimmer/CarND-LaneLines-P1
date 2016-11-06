@@ -117,9 +117,6 @@ class PipelineContext:
         self.r_m_ema = 0
         self.r_b_ema = 0
 
-        self.l_prior = tuple((None, None, None, None))
-        self.r_prior = tuple((None, None, None, None))
-
         self.ema_fps_period = ema_period_alpha * FPS
 
     def process_video(self, src_video_path, dst_video_path, audio=False):
@@ -283,7 +280,7 @@ class PipelineContext:
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
 
-    def update_ema(self, measurement, all_measurements, curr_ema):
+    def compute_ema(self, measurement, all_measurements, curr_ema):
         sma = sum(all_measurements) / (len(all_measurements))
 
         if len(all_measurements) < self.ema_fps_period:
@@ -298,7 +295,7 @@ class PipelineContext:
         return ema
 
     @staticmethod
-    def find_least_squares_line(lines):
+    def compute_least_squares_line(lines):
         all_x1 = []
         all_y1 = []
         all_x2 = []
@@ -327,27 +324,18 @@ class PipelineContext:
         abs_max_y = self.vertices[0][0][1]
 
         all_y2 = []
-        left_slopes = []
-        left_intercepts = []
-
         for line in lines:
-            x1, y1, x2, y2, angle, m, b = line.x1, line.y1, line.x2, line.y2, line.angle(), line.slope(), line.y_intercept()
-            all_y2.append(y2)
-            left_slopes.append(m)
-            left_intercepts.append(b)
+            all_y2.append(line.y2)
 
-        # Find the average of all slopes and y-intercepts to essentially center the final line along the lane line
-        # m = sum(left_slopes) / len(left_slopes)
-        # b = sum(left_intercepts) / len(left_intercepts)
+        # Least squares is a wee bit smoother than simply averaging slopes and intercepts
+        m, b = self.compute_least_squares_line(lines)
 
-        # Least squares is a wee bit smoother
-        m, b = self.find_least_squares_line(lines)
-
+        # Computes the EMA of all measurements over time
         self.l_m_measurements = np.append(self.l_m_measurements, m)
         self.l_b_measurements = np.append(self.l_b_measurements, b)
 
-        self.l_m_ema = self.update_ema(m, self.l_m_measurements, self.l_m_ema)
-        self.l_b_ema = self.update_ema(b, self.l_b_measurements, self.l_b_ema)
+        self.l_m_ema = self.compute_ema(m, self.l_m_measurements, self.l_m_ema)
+        self.l_b_ema = self.compute_ema(b, self.l_b_measurements, self.l_b_ema)
 
         if len(self.l_m_measurements) > self.ema_fps_period:
             self.l_m_measurements = np.delete(self.l_m_measurements, 0)
@@ -362,6 +350,8 @@ class PipelineContext:
         # Smooth out our y2 by remembering the smallest y2.
         # doesn't work well on curves at which point I would switch to a
         # different algorithm for curve analysis
+
+        # extrapolate
         if self.l_abs_min_y is None:
             self.l_abs_min_y = min(all_y2)
         y2 = min(self.l_abs_min_y, int(sum(all_y2) / len(all_y2)))
@@ -373,37 +363,23 @@ class PipelineContext:
 
         cv2.line(img, (x1, y1), (x2, y2), self.line_color, self.thickness)
 
-        # keep our priors updated
-        self.l_prior = tuple((x1, y1, x2, y2))
-
     def draw_right_line(self, img, lines):
         # y value for bottom right vertice
         abs_max_y = self.vertices[0][3][1]
 
         all_y1 = []
-        slopes = []
-        intercepts = []
-
         for line in lines:
-            x1, y1, x2, y2, angle, m, b = line.x1, line.y1, line.x2, line.y2, line.angle(), line.slope(), line.y_intercept()
-            all_y1.append(y1)
-            slopes.append(m)
-            intercepts.append(b)
+            all_y1.append(line.y1)
 
-        # Find the average of all slopes and y-intercepts to essentially center the final line along the lane line
-        # m = sum(slopes) / len(slopes)
-        # b = sum(intercepts) / len(intercepts)
+        # Least squares is a wee bit smoother than simply averaging slopes and intercepts
+        m, b = self.compute_least_squares_line(lines)
 
-        # Least squares is a wee bit smoother
-        m, b = self.find_least_squares_line(lines)
-
-        # Computes the exponential moving average of
-        # all measurements over time
+        # Computes the EMA of all measurements over time
         self.r_m_measurements = np.append(self.r_m_measurements, m)
         self.r_b_measurements = np.append(self.r_b_measurements, b)
 
-        self.r_m_ema = self.update_ema(m, self.r_m_measurements, self.r_m_ema)
-        self.r_b_ema = self.update_ema(b, self.r_b_measurements, self.r_b_ema)
+        self.r_m_ema = self.compute_ema(m, self.r_m_measurements, self.r_m_ema)
+        self.r_b_ema = self.compute_ema(b, self.r_b_measurements, self.r_b_ema)
 
         if len(self.r_m_measurements) > self.ema_fps_period:
             self.r_m_measurements = np.delete(self.r_m_measurements, 0)
@@ -419,10 +395,9 @@ class PipelineContext:
         # doesn't work well on curves at which point I would switch to a
         # different algorithm for curve analysis
 
-        y1 = int(sum(all_y1) / len(all_y1))
+        # extrapolate
         if self.r_abs_min_y is None:
             self.r_abs_min_y = min(all_y1)
-        # y1 = min(self.r_abs_min_y, min(all_y1))
         y1 = min(self.r_abs_min_y, int(sum(all_y1) / len(all_y1)))
         self.r_abs_min_y = y1
 
@@ -431,9 +406,6 @@ class PipelineContext:
         x2 = int((y2 - b) / m)
 
         cv2.line(img, (x1, y1), (x2, y2), self.line_color, self.thickness)
-
-        # keep our priors updated
-        self.r_prior = tuple((x1, y1, x2, y2))
 
     def draw_lines(self, img, lines):
         """
