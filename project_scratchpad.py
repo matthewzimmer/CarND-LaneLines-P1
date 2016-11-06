@@ -544,7 +544,7 @@ pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=5
 
 pipeline_context.process_video('solidYellowLeft.mp4', 'yellow.mp4')
 
-# This pipeline context is sufficient for all test_images as well as for solidYellowLeft.mp4 and solidWhiteRight.mp4
+# extra.mp4
 pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=50, canny_high_threshold=150,
                                    region_bottom_offset=55,
                                    region_vertice_weights=np.array(
