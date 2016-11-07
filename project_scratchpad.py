@@ -310,14 +310,27 @@ class PipelineContext:
 
         all_x = (all_x1 + all_x2)
         all_y = (all_y1 + all_y2)
-        mean_x = sum(all_x) / len(all_x)
-        mean_y = sum(all_y) / len(all_y)
 
-        m = sum([(xi - mean_x) * (yi - mean_y) for xi, yi in zip(all_x, all_y)]) / sum(
-            [(xi - mean_x) ** 2 for xi in zip(all_x)])
-        b = mean_y - m * mean_x
+        # This is a tab less precise
+        # mean_x = sum(all_x) / len(all_x)
+        # mean_y = sum(all_y) / len(all_y)
 
-        return m[0], b[0]
+        # m = sum([(xi - mean_x) * (yi - mean_y) for xi, yi in zip(all_x, all_y)]) / sum([(xi - mean_x) ** 2 for xi in zip(all_x)])
+        # b = mean_y - m * mean_x
+        # print('m: %s, b: %s' % (m, b))
+        # return m[0], b[0]
+
+        n = len(all_x)
+
+        all_x_y_dot_prod = sum([xi * yi for xi, yi in zip(all_x, all_y)])
+        all_x_squares = sum([xi ** 2 for xi in all_x])
+
+        a = ((n * all_x_y_dot_prod) - (sum(all_x) * sum(all_y))) / ((n * all_x_squares) - (sum(all_x) ** 2))
+        b = ((sum(all_y) * all_x_squares) - (sum(all_x) * all_x_y_dot_prod)) / ((n * all_x_squares) - (sum(all_x) ** 2))
+
+        # print('m: %s, b: %s' % (m, b))
+
+        return a, b
 
     def draw_left_line(self, img, lines):
         # y value for bottom left vertice
@@ -545,7 +558,7 @@ pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=5
 pipeline_context.process_video('solidYellowLeft.mp4', 'yellow.mp4')
 
 # extra.mp4
-pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=50, canny_high_threshold=150,
+pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=0, canny_high_threshold=250,
                                    region_bottom_offset=55,
                                    region_vertice_weights=np.array(
                                        [(1, 0.95), (0.40, 0.65), (0.60, 0.65), (1, 0.935)]),
