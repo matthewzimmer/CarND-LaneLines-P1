@@ -68,8 +68,8 @@ class LaneLine:
         return self.y1 - self.slope() * self.x1
 
     def __str__(self):
-        return "(x1, y1, x2, y2, slope, y_intercept) == (%s, %s, %s, %s, %s, %s)" % (
-            self.x1, self.y1, self.x2, self.y2, self.slope(), self.y_intercept())
+        return "(x1, y1, x2, y2, slope, y_intercept, angle) == (%s, %s, %s, %s, %s, %s, %s)" % (
+            self.x1, self.y1, self.x2, self.y2, self.slope(), self.y_intercept(), self.angle())
 
 
 class HoughTransformPipeline:
