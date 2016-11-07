@@ -333,7 +333,8 @@ class PipelineContext:
         return a, b
 
     def draw_left_line(self, img, lines):
-        # y value for bottom left vertice
+        # y value for bottom left vertice...this is the
+        # principle y1 used during extrapolation
         abs_max_y = self.vertices[0][0][1]
 
         all_y2 = []
@@ -343,7 +344,9 @@ class PipelineContext:
         # Least squares is a wee bit smoother than simply averaging slopes and intercepts
         m, b = self.compute_least_squares_line(lines)
 
-        # Computes the EMA of all measurements over time
+        # Computes the EMA of all measurements over time for an even more smooth/stable line
+        # See self.ema_period_alpha to adjust the number of elements in a given period
+        # to track.
         self.l_m_measurements = np.append(self.l_m_measurements, m)
         self.l_b_measurements = np.append(self.l_b_measurements, b)
 
@@ -387,7 +390,9 @@ class PipelineContext:
         # Least squares is a wee bit smoother than simply averaging slopes and intercepts
         m, b = self.compute_least_squares_line(lines)
 
-        # Computes the EMA of all measurements over time
+        # Computes the EMA of all measurements over time for an even more smooth/stable line
+        # See self.ema_period_alpha to adjust the number of elements in a given period
+        # to track.
         self.r_m_measurements = np.append(self.r_m_measurements, m)
         self.r_b_measurements = np.append(self.r_b_measurements, b)
 
