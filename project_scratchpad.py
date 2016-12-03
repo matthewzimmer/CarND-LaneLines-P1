@@ -83,6 +83,7 @@ class HoughTransformPipeline:
 
 class PipelineContext:
     def __init__(self,
+                 cvt_to_hls=False,
                  thickness=5,
                  gaussian_kernel_size=5,
                  canny_low_threshold=50,
@@ -101,7 +102,7 @@ class PipelineContext:
         self.hough_transform_pipeline = hough_transform_pipeline
         self.line_color = line_color
         self.vertices = None
-        self.cvt_hsv = False
+        self.cvt_to_hls = cvt_to_hls
         self.current_frame = 0
 
         self.l_abs_min_y = None
@@ -126,46 +127,77 @@ class PipelineContext:
     def process_image(self, image):
         self.current_frame += 1
 
-        if self.cvt_hsv:
+        if self.cvt_to_hls:
             '''Still a work in progress'''
-            hsv_img = self.hsv(image)
 
-            # if self.current_frame == 1:
-            #     mpimg.imsave("1_hsv_1_" + str(self.current_frame), hsv_img)
+            # Convert BGR to HLS
+            hls_img = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
+
+            # get just yellow in HLS
+            # yellow = np.uint8([[[51, 204, 255]]])
+            yellow = np.uint8([[[255, 204, 51]]])
+            hls_yellow = cv2.cvtColor(yellow, cv2.COLOR_BGR2HLS)
+            print(hls_yellow)
+
+            # Threshold the HLS image to get only blue colors
+            # lower_blue = np.array([110, 50, 50])
+            # upper_blue = np.array([130, 255, 255])
+            # mask = cv2.inRange(hls_img, lower_blue, upper_blue)
+
+            # yellow upper/lower threshold [23, 216, 255]
+            lower_yellow = np.array([hls_yellow[0][0][0]-10,100,100])
+            upper_yellow = np.array([hls_yellow[0][0][0]+10,255,255])
+            mask = cv2.inRange(hls_img, hls_yellow, hls_yellow)
+
+            # Bitwise-AND mask and original image
+            res = cv2.bitwise_and(image, image, mask=mask)
+
+
+            # Now you take [H-10, 100,100] and [H+10, 255, 255] as lower bound and upper bound respectively. Apart
+            # from this method, you can use any image editing tools like GIMP or any online converters to find these
+            # values, but don't forget to adjust the HLS ranges.
+
+            if self.current_frame == 1:
+                mpimg.imsave('1_hls_yellow_frame', image)
+                mpimg.imsave('1_hls_yellow_mask', mask)
+                mpimg.imsave('1_hls_yellow_result', res)
+                mpimg.imsave("1_hls_1_" + str(self.current_frame), hls_img)
 
             # Define a kernel size for Gaussian smoothing / blurring
-            blur_hsv = self.gaussian_noise(hsv_img, self.gaussian_kernel_size)
+            blur_hls = self.gaussian_noise(hls_img, self.gaussian_kernel_size)
 
             # if self.current_frame == 1:
-            #     mpimg.imsave("1_hsv_blur_" + str(self.current_frame), blur_hsv)
+            #     mpimg.imsave("1_hls_blur_" + str(self.current_frame), blur_hls)
 
+            # define range of blue color in hls
             WHITE_MIN_RGB = np.uint8([[[50, 50, 50]]])
             WHITE_MAX_RGB = np.uint8([[[150, 150, 150]]])
 
-            WHITE_MIN_HSV = cv2.cvtColor(WHITE_MIN_RGB, cv2.COLOR_BGR2HSV)
-            WHITE_MAX_HSV = cv2.cvtColor(WHITE_MAX_RGB, cv2.COLOR_BGR2HSV)
+            WHITE_MIN_HLS = cv2.cvtColor(WHITE_MIN_RGB, cv2.COLOR_BGR2HLS)
+            WHITE_MAX_HLS = cv2.cvtColor(WHITE_MAX_RGB, cv2.COLOR_BGR2HLS)
 
-            WHITE_MIN = np.array(WHITE_MIN_HSV, np.uint8)
-            WHITE_MAX = np.array(WHITE_MAX_HSV, np.uint8)
+            WHITE_MIN = np.array(WHITE_MIN_HLS, np.uint8)
+            WHITE_MAX = np.array(WHITE_MAX_HLS, np.uint8)
+
 
             # YELLOW_MIN = np.array([255, 226, 143], np.uint8)
             # YELLOW_MAX = np.array([255, 199, 37], np.uint8)
 
-            blur_hsv_white = cv2.inRange(blur_hsv, WHITE_MIN, WHITE_MAX)
+            blur_hls_white = cv2.inRange(blur_hls, WHITE_MIN, WHITE_MAX)
             # if self.current_frame == 1:
-            #     mpimg.imsave("1_hsv_white_" + str(self.current_frame), blur_hsv_white)
+            #     mpimg.imsave("1_hls_white_" + str(self.current_frame), blur_hls_white)
 
-            # blur_hsv_yellow = cv2.inRange(blur_hsv, YELLOW_MIN, YELLOW_MAX)
+            # blur_hls_yellow = cv2.inRange(blur_hls, YELLOW_MIN, YELLOW_MAX)
             # if self.current_frame == 1:
-            #     mpimg.imsave("1_hsv_yellow_" + str(self.current_frame), blur_hsv_yellow)
+            #     mpimg.imsave("1_hls_yellow_" + str(self.current_frame), blur_hls_yellow)
 
             # Define our parameters for Canny and run it
             low_threshold = self.canny_low_threshold
             high_threshold = self.canny_high_threshold
-            edges = self.canny(blur_hsv, low_threshold, high_threshold)
+            edges = self.canny(blur_hls, low_threshold, high_threshold)
 
             # if self.current_frame == 1:
-            #     mpimg.imsave("1_hsv_canny_" + str(self.current_frame), edges)
+            #     mpimg.imsave("1_hls_canny_" + str(self.current_frame), edges)
 
         else:
             # call as plt.imshow(gray, cmap='gray') to show a grayscaled image
@@ -230,13 +262,12 @@ class PipelineContext:
         return weighted_hough
 
     @staticmethod
-    def hsv(img):
-        """Converts colorspace from RGB to HSV
-        This will return an image with HSV color space
-        but NOTE: to see the returned image as HSV
-        you should call plt.imshow(hsv)"""
-        return cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
-        # return cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    def hls(img):
+        """Converts colorspace from RGB to HLS
+        This will return an image with HLS color space
+        but NOTE: to see the returned image as HLS
+        you should call plt.imshow(hls)"""
+        return cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
 
     @staticmethod
     def grayscale(img):
@@ -458,7 +489,6 @@ class PipelineContext:
         # this is accurate enough for first pass.
         for line in lines:
             for x1, y1, x2, y2 in line:
-
                 # An offset may be specified to compensate for pixels that are made up by
                 # erroneous data such as a hood or dashboard reflection
 
@@ -467,20 +497,14 @@ class PipelineContext:
                 angle = math.atan2(y2 - y1, x2 - x1) * 180.0 / np.pi
 
                 if angle is not 0.:
-                    # m = (y2 - y1) / (x2 - x1)
-                    # b = y1 - m * x1
-
-                    # line_tuple = tuple((x1, y1, x2, y2, angle, m, b))
                     lane_line = LaneLine(x1, y1, x2, y2)
 
                     # left lane line
                     if -50 < angle <= -25:
-                        # left_lines.append(line_tuple)
                         left_lines.append(lane_line)
 
                     # right lane line
                     elif 20 <= angle <= 45:
-                        # right_lines.append(line_tuple)
                         right_lines.append(lane_line)
 
                         # else:
@@ -564,6 +588,7 @@ pipeline_context.process_video('solidYellowLeft.mp4', 'yellow.mp4')
 
 # extra.mp4
 pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=0, canny_high_threshold=250,
+                                   cvt_to_hls=True,
                                    region_bottom_offset=55,
                                    region_vertice_weights=np.array(
                                        [(1, 0.95), (0.40, 0.65), (0.60, 0.65), (1, 0.935)]),
