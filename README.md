@@ -30,6 +30,11 @@ Once you have Anaconda installed, first double check you are in your Python 3 en
 `>>>`   
 (Ctrl-d to exit Python)
 
+Install OpenCV on mac using Homebrew:
+
+`$ brew tap homebrew/science`  
+`$ brew install opencv3 --with-contrib`
+
 run the following command at the terminal prompt to get OpenCV:
 
 `>  conda install -c https://conda.anaconda.org/menpo opencv3`
