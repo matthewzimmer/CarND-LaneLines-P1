@@ -83,7 +83,7 @@ class HoughTransformPipeline:
 
 class PipelineContext:
     def __init__(self,
-                 cvt_to_hls=False,
+                 colorspace=None,
                  thickness=5,
                  gaussian_kernel_size=5,
                  canny_low_threshold=50,
@@ -102,7 +102,7 @@ class PipelineContext:
         self.hough_transform_pipeline = hough_transform_pipeline
         self.line_color = line_color
         self.vertices = None
-        self.cvt_to_hls = cvt_to_hls
+        self.colorspace = colorspace
         self.current_frame = 0
 
         self.l_abs_min_y = None
@@ -127,89 +127,75 @@ class PipelineContext:
     def process_image(self, image):
         self.current_frame += 1
 
-        if self.cvt_to_hls:
-            '''Still a work in progress'''
+        cvt_img = image
+        gray_img = None
+        if self.colorspace is not None:
+            if self.colorspace is 'yuv':
+                cvt_img = self.yuv(image)
+                gray_img = cvt_img[:,:,0]
 
-            # Convert BGR to HLS
-            hls_img = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
+                # alpha = 0.2
+                # mpimg.imsave("{}_{}_gray_boost".format(str(self.current_frame), self.colorspace), gray_img*alpha, cmap='gray')
 
-            # get just yellow in HLS
-            # yellow = np.uint8([[[51, 204, 255]]])
-            yellow = np.uint8([[[255, 204, 51]]])
-            hls_yellow = cv2.cvtColor(yellow, cv2.COLOR_BGR2HLS)
-            print(hls_yellow)
+                # cvt_img_copy = np.copy(cvt_img)
+                # y, u, v = cvt_img[:,:,0], cvt_img[:,:,1], cvt_img[:,:,2]
+                #mask = (y == r1) & (green == g1) & (blue == b1)
+                #data[:,:,:3][mask] = [r2, g2, b2]
+                #cvt_img_copy[:,:,:3] = [y*alpha, u, v]
 
-            # Threshold the HLS image to get only blue colors
-            # lower_blue = np.array([110, 50, 50])
-            # upper_blue = np.array([130, 255, 255])
-            # mask = cv2.inRange(hls_img, lower_blue, upper_blue)
+                # cvt_img[:,:,0] = cvt_img[:,:,0]*alpha
 
-            # yellow upper/lower threshold [23, 216, 255]
-            lower_yellow = np.array([hls_yellow[0][0][0]-10,100,100])
-            upper_yellow = np.array([hls_yellow[0][0][0]+10,255,255])
-            mask = cv2.inRange(hls_img, hls_yellow, hls_yellow)
+                # plt.imshow(img)
+                # mpimg.imsave("{}_{}_cvt_y".format(str(self.current_frame), self.colorspace), cvt_img[:,:,0], cmap='gray')
+                # mpimg.imsave("{}_{}_cvt_u".format(str(self.current_frame), self.colorspace), cvt_img[:,:,1])
+                # mpimg.imsave("{}_{}_cvt_v".format(str(self.current_frame), self.colorspace), cvt_img[:,:,2])
 
-            # Bitwise-AND mask and original image
-            res = cv2.bitwise_and(image, image, mask=mask)
+                # plt.imshow(cvt_img[:,:,0], cmap='gray')
+                # TODO Identify color threshold and mask out all other pixels
 
+            elif self.colorspace == 'hls':
+                cvt_img = self.hls(image)
+                gray_img = cvt_img[:,:,1]
 
-            # Now you take [H-10, 100,100] and [H+10, 255, 255] as lower bound and upper bound respectively. Apart
-            # from this method, you can use any image editing tools like GIMP or any online converters to find these
-            # values, but don't forget to adjust the HLS ranges.
+                # alpha = 0.2
+                # mpimg.imsave("{}_{}_gray_boost".format(str(self.current_frame), self.colorspace), gray_img*alpha, cmap='gray')
 
-            if self.current_frame == 1:
-                mpimg.imsave('1_hls_yellow_frame', image)
-                mpimg.imsave('1_hls_yellow_mask', mask)
-                mpimg.imsave('1_hls_yellow_result', res)
-                mpimg.imsave("1_hls_1_" + str(self.current_frame), hls_img)
+                # mpimg.imsave("{}_{}_cvt_l".format(str(self.current_frame), self.colorspace), cvt_img[:,:,1], cmap='gray')
 
-            # Define a kernel size for Gaussian smoothing / blurring
-            blur_hls = self.gaussian_noise(hls_img, self.gaussian_kernel_size)
+                # plt.imshow(cvt_img[:,:,1], cmap='gray')
+                # TODO Identify color threshold and mask out all other pixels
 
-            # if self.current_frame == 1:
-            #     mpimg.imsave("1_hls_blur_" + str(self.current_frame), blur_hls)
+            elif self.colorspace == 'hsv':
+                cvt_img = self.hsv(image)
+                gray_img = cvt_img[:,:,2]
 
-            # define range of blue color in hls
-            WHITE_MIN_RGB = np.uint8([[[50, 50, 50]]])
-            WHITE_MAX_RGB = np.uint8([[[150, 150, 150]]])
+                # alpha = 0.2
+                # mpimg.imsave("{}_{}_gray_boost".format(str(self.current_frame), self.colorspace), gray_img*alpha, cmap='gray')
 
-            WHITE_MIN_HLS = cv2.cvtColor(WHITE_MIN_RGB, cv2.COLOR_BGR2HLS)
-            WHITE_MAX_HLS = cv2.cvtColor(WHITE_MAX_RGB, cv2.COLOR_BGR2HLS)
+                # mpimg.imsave("{}_{}_cvt_l".format(str(self.current_frame), self.colorspace), gray_img, cmap='gray')
 
-            WHITE_MIN = np.array(WHITE_MIN_HLS, np.uint8)
-            WHITE_MAX = np.array(WHITE_MAX_HLS, np.uint8)
+                # plt.imshow(cvt_img[:,:,1], cmap='gray')
+                # TODO Identify color threshold and mask out all other pixels
 
-
-            # YELLOW_MIN = np.array([255, 226, 143], np.uint8)
-            # YELLOW_MAX = np.array([255, 199, 37], np.uint8)
-
-            blur_hls_white = cv2.inRange(blur_hls, WHITE_MIN, WHITE_MAX)
-            # if self.current_frame == 1:
-            #     mpimg.imsave("1_hls_white_" + str(self.current_frame), blur_hls_white)
-
-            # blur_hls_yellow = cv2.inRange(blur_hls, YELLOW_MIN, YELLOW_MAX)
-            # if self.current_frame == 1:
-            #     mpimg.imsave("1_hls_yellow_" + str(self.current_frame), blur_hls_yellow)
-
-            # Define our parameters for Canny and run it
-            low_threshold = self.canny_low_threshold
-            high_threshold = self.canny_high_threshold
-            edges = self.canny(blur_hls, low_threshold, high_threshold)
-
-            # if self.current_frame == 1:
-            #     mpimg.imsave("1_hls_canny_" + str(self.current_frame), edges)
-
-        else:
+        if gray_img is None:
             # call as plt.imshow(gray, cmap='gray') to show a grayscaled image
-            gray = self.grayscale(image)
+            gray_img = self.grayscale(cvt_img)
 
-            # Define a kernel size for Gaussian smoothing / blurring
-            blur_gray = self.gaussian_noise(gray, self.gaussian_kernel_size)
+        # Define a kernel size for Gaussian smoothing / blurring
+        blur_img = self.gaussian_noise(gray_img, self.gaussian_kernel_size)
 
-            # Define our parameters for Canny and run it
-            low_threshold = self.canny_low_threshold
-            high_threshold = self.canny_high_threshold
-            edges = self.canny(blur_gray, low_threshold, high_threshold)
+        # Define our parameters for Canny and run it
+        low_threshold = self.canny_low_threshold
+        high_threshold = self.canny_high_threshold
+        edges = self.canny(blur_img, low_threshold, high_threshold)
+
+        if self.current_frame > 0:
+            mpimg.imsave('{}_orig'.format(str(self.current_frame)), image)
+            # mpimg.imsave("{}_{}_cvt".format(str(self.current_frame), self.colorspace), cvt_img)
+            mpimg.imsave("{}_orig_gray".format(str(self.current_frame)), self.grayscale(image), cmap='gray')
+            mpimg.imsave("{}_{}_gray".format(str(self.current_frame), self.colorspace), gray_img, cmap='gray')
+            # mpimg.imsave("{}_{}_blur".format(str(self.current_frame), self.colorspace), blur_img)
+            # mpimg.imsave("{}_{}_edges".format(str(self.current_frame), self.colorspace), edges)
 
         # This time we are defining a four sided polygon to mask
         imshape = image.shape
@@ -268,6 +254,22 @@ class PipelineContext:
         but NOTE: to see the returned image as HLS
         you should call plt.imshow(hls)"""
         return cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+
+    @staticmethod
+    def hsv(img):
+        """Converts colorspace from RGB to HSV
+        This will return an image with HSV color space
+        but NOTE: to see the returned image as HSV
+        you should call plt.imshow(hsv)"""
+        return cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    @staticmethod
+    def yuv(img):
+        """Converts colorspace from RGB to YUV
+        This will return an image with YUV color space
+        but NOTE: to see the returned image as YUV
+        you should call plt.imshow(yuv)"""
+        return cv2.cvtColor(img, cv2.COLOR_BGR2YUV)
 
     @staticmethod
     def grayscale(img):
@@ -565,13 +567,13 @@ pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=5
                                    line_color=[0, 140, 255],
                                    ema_period_alpha=2)
 
-for image_name in os.listdir("test_images/"):
-    if image_name == '.DS_Store':
-        continue
-    result = pipeline_context.process_image(mpimg.imread('test_images/' + image_name))
-    mpimg.imsave("RENDERED_" + image_name, result)
+# for image_name in os.listdir("test_images/"):
+#     if image_name == '.DS_Store':
+#         continue
+#     result = pipeline_context.process_image(mpimg.imread('test_images/' + image_name))
+#     mpimg.imsave("RENDERED_" + image_name, result)
 
-pipeline_context.process_video('solidWhiteRight.mp4', 'white.mp4')
+# pipeline_context.process_video('solidWhiteRight.mp4', 'white.mp4')
 
 # yellow.mp4
 pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=50, canny_high_threshold=150,
@@ -584,16 +586,16 @@ pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=5
                                    line_color=[0, 140, 255],
                                    ema_period_alpha=1)
 
-pipeline_context.process_video('solidYellowLeft.mp4', 'yellow.mp4')
+# pipeline_context.process_video('solidYellowLeft.mp4', 'yellow.mp4')
 
 # extra.mp4
-pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=0, canny_high_threshold=250,
-                                   cvt_to_hls=True,
+pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=50, canny_high_threshold=150,
+                                   colorspace='hsv',
                                    region_bottom_offset=55,
                                    region_vertice_weights=np.array(
                                        [(1, 0.95), (0.40, 0.65), (0.60, 0.65), (1, 0.935)]),
                                    hough_transform_pipeline=HoughTransformPipeline(rho=2, theta=np.pi / 180,
-                                                                                   threshold=40,
+                                                                                   threshold=20,
                                                                                    min_line_length=15,
                                                                                    max_line_gap=250),
                                    line_color=[0, 140, 255],
