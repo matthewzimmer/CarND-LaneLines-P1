@@ -128,56 +128,18 @@ class PipelineContext:
         self.current_frame += 1
 
         cvt_img = image
-        gray_img = None
-        if self.colorspace is not None:
-            if self.colorspace is 'yuv':
-                cvt_img = self.yuv(image)
-                gray_img = cvt_img[:,:,0]
+        if self.colorspace is 'yuv':
+            cvt_img = self.yuv(image)
+            gray_img = cvt_img[:, :, 0]
 
-                # alpha = 0.2
-                # mpimg.imsave("{}_{}_gray_boost".format(str(self.current_frame), self.colorspace), gray_img*alpha, cmap='gray')
+        elif self.colorspace == 'hls':
+            cvt_img = self.hls(image)
+            gray_img = cvt_img[:, :, 1]
 
-                # cvt_img_copy = np.copy(cvt_img)
-                # y, u, v = cvt_img[:,:,0], cvt_img[:,:,1], cvt_img[:,:,2]
-                #mask = (y == r1) & (green == g1) & (blue == b1)
-                #data[:,:,:3][mask] = [r2, g2, b2]
-                #cvt_img_copy[:,:,:3] = [y*alpha, u, v]
-
-                # cvt_img[:,:,0] = cvt_img[:,:,0]*alpha
-
-                # plt.imshow(img)
-                # mpimg.imsave("{}_{}_cvt_y".format(str(self.current_frame), self.colorspace), cvt_img[:,:,0], cmap='gray')
-                # mpimg.imsave("{}_{}_cvt_u".format(str(self.current_frame), self.colorspace), cvt_img[:,:,1])
-                # mpimg.imsave("{}_{}_cvt_v".format(str(self.current_frame), self.colorspace), cvt_img[:,:,2])
-
-                # plt.imshow(cvt_img[:,:,0], cmap='gray')
-                # TODO Identify color threshold and mask out all other pixels
-
-            elif self.colorspace == 'hls':
-                cvt_img = self.hls(image)
-                gray_img = cvt_img[:,:,1]
-
-                # alpha = 0.2
-                # mpimg.imsave("{}_{}_gray_boost".format(str(self.current_frame), self.colorspace), gray_img*alpha, cmap='gray')
-
-                # mpimg.imsave("{}_{}_cvt_l".format(str(self.current_frame), self.colorspace), cvt_img[:,:,1], cmap='gray')
-
-                # plt.imshow(cvt_img[:,:,1], cmap='gray')
-                # TODO Identify color threshold and mask out all other pixels
-
-            elif self.colorspace == 'hsv':
-                cvt_img = self.hsv(image)
-                gray_img = cvt_img[:,:,2]
-
-                # alpha = 0.2
-                # mpimg.imsave("{}_{}_gray_boost".format(str(self.current_frame), self.colorspace), gray_img*alpha, cmap='gray')
-
-                # mpimg.imsave("{}_{}_cvt_l".format(str(self.current_frame), self.colorspace), gray_img, cmap='gray')
-
-                # plt.imshow(cvt_img[:,:,1], cmap='gray')
-                # TODO Identify color threshold and mask out all other pixels
-
-        if gray_img is None:
+        elif self.colorspace == 'hsv':
+            cvt_img = self.hsv(image)
+            gray_img = cvt_img[:, :, 2]
+        else:
             # call as plt.imshow(gray, cmap='gray') to show a grayscaled image
             gray_img = self.grayscale(cvt_img)
 
@@ -189,13 +151,10 @@ class PipelineContext:
         high_threshold = self.canny_high_threshold
         edges = self.canny(blur_img, low_threshold, high_threshold)
 
-        if self.current_frame > 0:
-            mpimg.imsave('{}_orig'.format(str(self.current_frame)), image)
-            # mpimg.imsave("{}_{}_cvt".format(str(self.current_frame), self.colorspace), cvt_img)
-            mpimg.imsave("{}_orig_gray".format(str(self.current_frame)), self.grayscale(image), cmap='gray')
-            mpimg.imsave("{}_{}_gray".format(str(self.current_frame), self.colorspace), gray_img, cmap='gray')
-            # mpimg.imsave("{}_{}_blur".format(str(self.current_frame), self.colorspace), blur_img)
-            # mpimg.imsave("{}_{}_edges".format(str(self.current_frame), self.colorspace), edges)
+        # if self.current_frame > 0:
+        #     mpimg.imsave('{}_orig'.format(str(self.current_frame)), image)
+        #     mpimg.imsave("{}_orig_gray".format(str(self.current_frame)), self.grayscale(image), cmap='gray')
+        #     mpimg.imsave("{}_{}_gray".format(str(self.current_frame), self.colorspace), gray_img, cmap='gray')
 
         # This time we are defining a four sided polygon to mask
         imshape = image.shape
@@ -232,18 +191,6 @@ class PipelineContext:
         β = 0.6
         λ = 0.
         weighted_hough = self.weighted_img(hough, image, α, β, λ)
-
-        # if self.current_frame == 1:
-        #     Create a "color" binary image to combine with line image
-        #     color_edges = np.dstack((edges, edges, edges))
-        #     mpimg.imsave("1_orig_" + str(self.current_frame), image)
-        #     mpimg.imsave("2_gray_" + str(self.current_frame), gray, cmap='gray')
-        #     mpimg.imsave("3_edges_" + str(self.current_frame), edges, cmap='Greys_r')
-        #     mpimg.imsave("4_hough_" + str(self.current_frame), hough)
-        #     mpimg.imsave("5_color_edges_" + str(self.current_frame), color_edges)
-        #     mpimg.imsave("6_weighted_huff_" + str(self.current_frame), weighted_hough)
-        # else:
-        #     mpimg.imsave("5_color_edges_" + str(self.current_frame), color_edges)
 
         return weighted_hough
 
@@ -535,8 +482,6 @@ class PipelineContext:
         # line_img = np.zeros(img.shape, dtype=np.uint8)
         line_img = np.copy(orig_img) * 0  # creating a blank to draw lines on
 
-        # mpimg.imsave("hough", line_img)
-
         self.draw_lines(line_img, lines)
         return line_img
 
@@ -599,6 +544,6 @@ pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=5
                                                                                    min_line_length=15,
                                                                                    max_line_gap=350),
                                    line_color=[0, 140, 255],
-                                   ema_period_alpha=6)
+                                   ema_period_alpha=2)
 
 pipeline_context.process_video('challenge.mp4', 'extra.mp4')
