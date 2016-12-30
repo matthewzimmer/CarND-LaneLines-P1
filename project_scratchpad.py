@@ -597,7 +597,7 @@ pipeline_context = PipelineContext(gaussian_kernel_size=3, canny_low_threshold=5
                                    hough_transform_pipeline=HoughTransformPipeline(rho=2, theta=np.pi / 180,
                                                                                    threshold=20,
                                                                                    min_line_length=15,
-                                                                                   max_line_gap=250),
+                                                                                   max_line_gap=350),
                                    line_color=[0, 140, 255],
                                    ema_period_alpha=6)
 
